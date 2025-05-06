@@ -1,30 +1,22 @@
 import { FormEvent, useCallback, useMemo, useReducer } from 'react';
 import { z } from 'zod';
 
-type FormFields = {
-  name: boolean | string;
-  age: boolean | string;
-};
-
-// Simple reducer function to keep track of form field states
-function formFieldsReducer(
-  currentState: FormFields,
-  nextState: Partial<FormFields>
-) {
-  return { ...currentState, ...nextState };
-}
-
-// Initial form field values to use for touched and error states
-const initialFields: FormFields = {
-  name: false,
-  age: false,
-};
-
-// Form schema to use for parsing form data
+// Form schema to use for validating form data
 const formSchema = z.object({
   name: z.string().min(2).max(100),
   age: z.coerce.number().min(18).max(199),
 });
+
+// Initial state for the reducer
+const initialFields = Object.fromEntries(Object.keys(formSchema.shape).map(k => [k, false])) as Record<keyof typeof formSchema.shape, boolean | string>
+
+// Simple reducer function to keep track of form field states
+function formFieldsReducer(
+  currentState: typeof initialFields,
+  nextState: Partial<typeof initialFields>
+) {
+  return { ...currentState, ...nextState };
+}
 
 export function App() {
   const [errors, setErrors] = useReducer(formFieldsReducer, initialFields);
@@ -33,8 +25,7 @@ export function App() {
   const isValid = useIsValid(errors, changed);
 
   const handleChange = useCallback((evt: FormEvent<HTMLFormElement>) => {
-    const formData = new FormData(evt.currentTarget);
-    const entries = Object.fromEntries(formData);
+    const entries = Object.fromEntries(new FormData(evt.currentTarget).entries());
     const changed = getChangedFields(entries);
     setChanged(changed);
     try {
@@ -50,8 +41,7 @@ export function App() {
 
   const handleSubmit = useCallback((evt: FormEvent<HTMLFormElement>) => {
     evt.preventDefault();
-    const formData = new FormData(evt.currentTarget);
-    const entries = Object.fromEntries(formData);
+    const entries = Object.fromEntries(new FormData(evt.currentTarget).entries());
     console.log('SUBMIT', entries);
   }, []);
 
@@ -99,7 +89,7 @@ function InputWithHelperText({
 }
 
 // Utility function to determine which fields were changed
-function getChangedFields(entries: Record<string, string>) {
+function getChangedFields(entries: Record<string, FormDataEntryValue>) {
   const changed = Object.keys(entries)
     .filter((key) => entries[key] !== '')
     .map((key) => [key, true]);
@@ -118,7 +108,7 @@ function useIsValid(
         .filter((error) => Boolean(error)).length === 0 &&
       Object.keys(changed)
         .map((key) => changed[key])
-        .filter((touched) => Boolean(touched)).length > 0,
+        .filter((changed) => Boolean(changed)).length > 0,
     [errors, changed]
   );
 }
